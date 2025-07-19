@@ -1,56 +1,100 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import LabelEncoder
 
-# Page Title
-st.title("Kaggle Competition Model Trainer")
+# ────────────────────────────────────────────────────────────
+# 🚀 Page config & Title
+st.set_page_config(page_title="Car Price Predictor", layout="centered")
+st.markdown(
+    "<h1 style='text-align: center; color: #2C3E50;'>🚗 Car Price Prediction App</h1>",
+    unsafe_allow_html=True
+)
+st.markdown(
+    "<p style='text-align: center;'>Fill in the details and hit Predict to estimate the price.</p>",
+    unsafe_allow_html=True
+)
+# ────────────────────────────────────────────────────────────
 
-# Load dataset
 @st.cache_data
-def load_data():
-    return pd.read_csv('Dateset/train.csv')  # Relative path (make sure train.csv is inside Dateset/)
+def load_and_prep_data():
+    # 1️⃣ Load (relative)  
+    df = pd.read_csv("Dateset/train.csv")
+    
+    # 2️⃣ Clean mileage  
+    def clean_running(x):
+        try:
+            return int(str(x).lower().replace("km","").replace(",","").strip())
+        except:
+            return 0
+    df["running"] = df["running"].apply(clean_running)
+    
+    # 3️⃣ Filter out crazy prices  
+    df = df[df["price"] < 50000]
+    
+    # 4️⃣ Vehicle age  
+    df["vehicle_age"] = 2025 - df["year"]
+    
+    # 5️⃣ Encode categoricals  
+    cat_cols = ["model","motor_type","wheel","color","type","status"]
+    encoders = {}
+    for c in cat_cols:
+        le = LabelEncoder()
+        df[c] = le.fit_transform(df[c].astype(str))
+        encoders[c] = le
+    
+    return df, encoders
 
-data = load_data()
+# Load once
+data, encoders = load_and_prep_data()
 
-st.subheader("Dataset Preview")
-st.write(data.head())
+# ────────────────────────────────────────────────────────────
+# 2️⃣ Sidebar / Input widgets
+st.sidebar.header("Vehicle Details")
+year        = st.sidebar.slider("Year", 1990, 2025, 2018)
+motor_vol   = st.sidebar.number_input("Motor Volume (L)", 0.2, 5.0, 2.0, 0.1)
+running     = st.sidebar.number_input("Mileage (km)", 0, 500_000, 50_000, 1_000)
 
-# Preprocessing (you can customize this based on your dataset)
-st.subheader("Preprocessing")
+model_in    = st.sidebar.selectbox("Model",        encoders["model"].classes_)
+motor_type  = st.sidebar.selectbox("Motor Type",   encoders["motor_type"].classes_)
+wheel_cat   = st.sidebar.selectbox("Wheel",        encoders["wheel"].classes_)
+color_cat   = st.sidebar.selectbox("Color",        encoders["color"].classes_)
+type_cat    = st.sidebar.selectbox("Type",         encoders["type"].classes_)
 
-# Drop rows with missing values
-data_clean = data.dropna()
-st.write(f"Cleaned Data Shape: {data_clean.shape}")
+# Build input row
+input_dict = {
+    "year": year,
+    "vehicle_age": 2025 - year,
+    "motor_volume": motor_vol,
+    "running": running,
+    "model":      encoders["model"].transform([model_in])[0],
+    "motor_type": encoders["motor_type"].transform([motor_type])[0],
+    "wheel":      encoders["wheel"].transform([wheel_cat])[0],
+    "type":       encoders["type"].transform([type_cat])[0]
+}
+input_df = pd.DataFrame([input_dict])
 
-# Select features and target
-features = st.multiselect("Select feature columns:", data_clean.columns[:-1], default=data_clean.columns[:-1])
-target = st.selectbox("Select target column:", data_clean.columns)
+# ────────────────────────────────────────────────────────────
+# 3️⃣ Train & Predict on button click
+if st.button("Predict Price 💰"):
+    # Train on full data each time (for demo)
+    X = data[["year","vehicle_age","motor_volume","running",
+              "model","motor_type","wheel","type"]]
+    y = data["price"]
+    model = RandomForestRegressor(
+        n_estimators=300, max_depth=10, min_samples_split=5, random_state=42
+    )
+    model.fit(X, y)
+    
+    pred = model.predict(input_df)[0]
+    st.success(f"**Estimated Price:** ${int(pred):,}")
 
-if features and target:
-    X = data_clean[features]
-    y = data_clean[target]
-
-    # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    # Train model
-    model = RandomForestClassifier()
-    model.fit(X_train, y_train)
-
-    # Predict
-    y_pred = model.predict(X_test)
-
-    # Accuracy
-    accuracy = accuracy_score(y_test, y_pred)
-    st.success(f"Model Accuracy: {accuracy * 100:.2f}%")
-
-    # Show feature importances
-    st.subheader("Feature Importance")
-    importances = pd.Series(model.feature_importances_, index=features)
-    st.bar_chart(importances.sort_values(ascending=False))
-
-else:
-    st.warning("Please select both features and target column to train the model.")
+# ────────────────────────────────────────────────────────────
+st.markdown("---")
+st.markdown(
+    "<p style='text-align: center; font-size:small;'>"
+    "Developed by Praveenan Pirabaharan"
+    "</p>",
+    unsafe_allow_html=True
+)
