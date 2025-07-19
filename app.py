@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 # 🚀 Page Configuration
 st.set_page_config(page_title="Car Price Predictor", layout="centered")
 st.markdown(
-    "<h1 style='text-align: center; color: #1f77b4;'>🚗 Car Price Predictor</h1>",
+    "<h1 style='text-align: center; color: #1f77b4;'>Car Price Predictor</h1>",
     unsafe_allow_html=True
 )
 st.markdown(
