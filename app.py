@@ -1,97 +1,56 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import LabelEncoder
+# Page Title
+st.title("Kaggle Competition Model Trainer")
 
-# 🚀 Page Configuration
-st.set_page_config(page_title="Car Price Predictor", layout="centered")
+# Load dataset
+@st.cache_data
+def load_data():
+    return pd.read_csv('Dateset/train.csv')  # Relative path (make sure train.csv is inside Dateset/)
 
-st.markdown("<h1 style='text-align: center; color: #2C3E50;'>🚗 Car Price Prediction App</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Enter vehicle details below to estimate the market price.</p>", unsafe_allow_html=True)
+data = load_data()
 
+st.subheader("Dataset Preview")
+st.write(data.head())
 
-@st.cache_resource
-def load_model():
-    try:
-        data = pd.read_csv('/Users/praveenan/Desktop/Kaggle competition/Dateset/train.csv')
-    except FileNotFoundError:
-        st.error("🚨 Dataset not found! Check the path to train.csv.")
-        return None, None
+# Preprocessing (you can customize this based on your dataset)
+st.subheader("Preprocessing")
 
-    # Check required columns exist
-    required_cols = ['model', 'motor_type', 'wheel', 'color', 'type', 'status', 'year', 'motor_volume', 'running', 'price']
-    missing_cols = [col for col in required_cols if col not in data.columns]
-    if missing_cols:
-        st.error(f"🚨 Missing required columns in dataset: {missing_cols}")
-        return None, None
+# Drop rows with missing values
+data_clean = data.dropna()
+st.write(f"Cleaned Data Shape: {data_clean.shape}")
 
-    # Clean running column
-    def clean_running(x):
-        try:
-            return int(str(x).replace('km', '').replace('KM', '').replace(' ', '').replace(',', '').strip())
-        except:
-            return 0
+# Select features and target
+features = st.multiselect("Select feature columns:", data_clean.columns[:-1], default=data_clean.columns[:-1])
+target = st.selectbox("Select target column:", data_clean.columns)
 
-    data['running'] = data['running'].apply(clean_running)
+if features and target:
+    X = data_clean[features]
+    y = data_clean[target]
 
-    # Filter out outliers for price
-    data = data[data['price'] < 50000]
+    # Train-test split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    data['vehicle_age'] = 2025 - data['year']
+    # Train model
+    model = RandomForestClassifier()
+    model.fit(X_train, y_train)
 
-    cat_cols = ['model', 'motor_type', 'wheel', 'color', 'type', 'status']
-    encoders = {}
-    for col in cat_cols:
-        le = LabelEncoder()
-        data[col] = le.fit_transform(data[col].astype(str))
-        encoders[col] = le
+    # Predict
+    y_pred = model.predict(X_test)
 
-    features = ['year', 'vehicle_age', 'motor_volume', 'model', 'motor_type', 'running', 'wheel', 'type']
-    X = data[features]
-    y = data['price']
+    # Accuracy
+    accuracy = accuracy_score(y_test, y_pred)
+    st.success(f"Model Accuracy: {accuracy * 100:.2f}%")
 
-    model = RandomForestRegressor(n_estimators=300, max_depth=10, min_samples_split=5, random_state=42)
-    model.fit(X, y)
+    # Show feature importances
+    st.subheader("Feature Importance")
+    importances = pd.Series(model.feature_importances_, index=features)
+    st.bar_chart(importances.sort_values(ascending=False))
 
-    return model, encoders
-
-model, encoders = load_model()
-
-if model is None:
-    st.stop()
-
-# 2️⃣ UI Inputs
-year = st.slider('Year', 1990, 2025, 2018)
-motor_volume = st.number_input('Motor Volume (L)', min_value=0.2, max_value=5.0, value=2.0, step=0.1)
-running = st.number_input('Mileage (km)', min_value=0, max_value=500000, value=50000, step=1000)
-
-model_input = st.selectbox('Model', list(encoders['model'].classes_))
-motor_type_input = st.selectbox('Motor Type', list(encoders['motor_type'].classes_))
-wheel_input = st.selectbox('Wheel', list(encoders['wheel'].classes_))
-color_input = st.selectbox('Color', list(encoders['color'].classes_))
-type_input = st.selectbox('Type', list(encoders['type'].classes_))
-
-# 3️⃣ Prepare Input for Model
-input_data = {
-    'year': year,
-    'vehicle_age': 2025 - year,
-    'motor_volume': motor_volume,
-    'model': encoders['model'].transform([model_input])[0],
-    'motor_type': encoders['motor_type'].transform([motor_type_input])[0],
-    'running': running,
-    'wheel': encoders['wheel'].transform([wheel_input])[0],
-    'type': encoders['type'].transform([type_input])[0]
-}
-
-input_df = pd.DataFrame([input_data])
-
-# 4️⃣ Prediction
-if st.button('Predict Price 💰'):
-    predicted_price = model.predict(input_df)[0]
-    st.success(f"Estimated Car Price: **${int(predicted_price):,}**")
-
-# Footer
-st.markdown("<hr>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: small;'>Developed for CIS6005 Project | Praveenan Pirabaharan </p>", unsafe_allow_html=True)
+else:
+    st.warning("Please select both features and target column to train the model.")
