@@ -1,0 +1,25 @@
+📊 Here’s a Summary of What Your Plots Reveal:
+Year Distribution & Boxplot:
+
+Majority of vehicles are post-2010, peaking around 2015–2020.
+
+There are older vehicles (outliers) before 2000—these could impact the model if not handled carefully.
+
+Motor Volume Distribution & Boxplot:
+
+Very tight concentration around 2.0 with a few rare outliers at very low or high values (e.g., 0.2, 4.0).
+
+No strong visual correlation with price.
+
+Price Distribution & Boxplot:
+
+Highly skewed right—most prices cluster below $25,000 but some extreme outliers reach $87,000.
+
+These high values are clear outliers and could distort the model.
+
+Correlation Heatmap:
+
+Only year and price show a moderate positive correlation (0.64).
+
+Motor volume has no real correlation with price in this dataset.
+
