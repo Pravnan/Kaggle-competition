@@ -19,7 +19,7 @@ st.markdown(
 # ────────────────────────────────────────────────────────────
 @st.cache_data
 def load_and_prep_data():
-    df = pd.read_csv("Dateset/train.csv")
+    df = pd.read_csv("Dateset/Car_prediciton_update_finalain.csv")
 
     def clean_running(x):
         try:
